@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 import os
 
-from api import router as api_router
+from .api import router as api_router
 
 app = FastAPI(
     title="Vertex AI API",

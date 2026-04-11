@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+    depends_on:
+      - backend
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+    networks:
+      - vertex-network
+
+  backend:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=${DATABASE_URL}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+    depends_on:
+      - redis
+      - postgres
+    volumes:
+      - ./apps/api:/app
+    networks:
+      - vertex-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - vertex-network
+
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+      - POSTGRES_DB=${POSTGRES_DB:-vertexai}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - vertex-network
+
+  # Supabase模拟（如果不用真实Supabase）
+  supabase-local:
+    image: supabase/postgres:15.1.0.128
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - supabase-data:/var/lib/postgresql/data
+    networks:
+      - vertex-network
+
+volumes:
+  redis-data:
+  postgres-data:
+  supabase-data:
+
+networks:
+  vertex-network:
+    driver: bridge
