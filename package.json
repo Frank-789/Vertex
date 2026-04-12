@@ -4,6 +4,7 @@
   "private": true,
   "description": "Vertex AI电商智能体",
   "main": "index.js",
+  "packageManager": "npm@10.8.2",
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",

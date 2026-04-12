@@ -1,10 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // 使用 SWC 而不是 Turbopack
+  swcMinify: true,
   experimental: {
-    // 禁用 Turbopack，使用传统的 webpack 构建
-    turbo: false,
+    // 明确禁用 Turbopack
+    turbo: {
+      enabled: false,
+    },
   },
-  // 如果需要，可以配置其他选项
 }
 
 module.exports = nextConfig
