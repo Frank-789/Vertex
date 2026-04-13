@@ -13,9 +13,15 @@ app = FastAPI(
 )
 
 # CORS配置
+# 从环境变量获取允许的源，默认包含本地开发环境
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8501").split(",")
+# 如果环境变量为空，使用默认值
+if allowed_origins == [""]:
+    allowed_origins = ["http://localhost:3000", "http://localhost:8501"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:8501"],  # 前端和旧Streamlit
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -33,4 +39,7 @@ async def health():
     return {"status": "ok"}
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.getenv("PORT", 8000))
+    # 生产环境关闭reload，开发环境开启
+    reload = os.getenv("ENVIRONMENT") == "development"
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=reload)

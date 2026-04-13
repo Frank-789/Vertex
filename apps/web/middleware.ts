@@ -47,7 +47,7 @@ export async function middleware(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     // 保护需要认证的路由
-    const protectedPaths = ['/chat', '/workshop', '/dashboard']
+    const protectedPaths = ['/workshop', '/dashboard']
     const isProtected = protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))
 
     if (isProtected && !user) {

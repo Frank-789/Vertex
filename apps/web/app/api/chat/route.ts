@@ -5,12 +5,19 @@ const PYTHON_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000
 
 export async function POST(request: NextRequest) {
   try {
-    // 验证用户
+    // 验证用户，允许匿名访问
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
+    // 为匿名用户生成临时ID
+    let userId: string
     if (authError || !user) {
-      return NextResponse.json({ error: '未授权访问' }, { status: 401 })
+      // 生成匿名用户ID，基于时间戳和随机数
+      const timestamp = Date.now()
+      const random = Math.random().toString(36).substring(2, 10)
+      userId = `anon_${timestamp}_${random}`
+    } else {
+      userId = user.id
     }
 
     // 获取请求数据
@@ -26,9 +33,9 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-User-Id': user.id,
+        'X-User-Id': userId,
       },
-      body: JSON.stringify({ message, file_url, user_id: user.id }),
+      body: JSON.stringify({ message, file_url, user_id: userId }),
     })
 
     if (!response.ok) {
@@ -52,14 +59,21 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
+    let userId: string
     if (!user) {
-      return NextResponse.json({ error: '未授权访问' }, { status: 401 })
+      // 匿名用户返回空历史
+      return NextResponse.json({
+        messages: [],
+        user_id: 'anonymous',
+      })
+    } else {
+      userId = user.id
     }
 
     // 获取聊天历史（这里可以从数据库获取，暂时返回空）
     return NextResponse.json({
       messages: [],
-      user_id: user.id,
+      user_id: userId,
     })
   } catch (error) {
     console.error('获取聊天历史错误:', error)

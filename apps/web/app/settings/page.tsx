@@ -1,10 +1,30 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { User, Bell, Shield, Database, Download, Moon, Globe } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import AvatarUpload from '@/components/ui/AvatarUpload'
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile')
+  const [user, setUser] = useState<any>(null)
+  const [isLoadingUser, setIsLoadingUser] = useState(true)
+  const supabase = createClient()
+
+  useEffect(() => {
+    const getUser = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        setUser(user)
+      } catch (error) {
+        console.error('获取用户信息失败:', error)
+      } finally {
+        setIsLoadingUser(false)
+      }
+    }
+
+    getUser()
+  }, [supabase])
   const [notifications, setNotifications] = useState({
     email: true,
     push: false,
@@ -64,61 +84,81 @@ export default function SettingsPage() {
           {activeTab === 'profile' && (
             <div className="glass rounded-2xl p-6">
               <h3 className="text-lg font-semibold mb-6">个人资料</h3>
-              <div className="space-y-6">
-                <div className="flex items-center gap-6">
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary-light to-accent"></div>
-                  <div>
-                    <button className="px-4 py-2 rounded-lg bg-secondary/30 text-sm font-medium hover:bg-secondary/50 transition">
-                      更换头像
-                    </button>
-                    <p className="text-xs text-text-muted mt-2">支持 JPG, PNG 格式，最大 5MB</p>
-                  </div>
+              {isLoadingUser ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-light mx-auto mb-4"></div>
+                  <p className="text-text-muted">加载用户信息...</p>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">姓名</label>
-                    <input
-                      type="text"
-                      defaultValue="张三"
-                      className="w-full px-4 py-3 rounded-xl bg-secondary/30 border border-border focus:border-primary-light focus:outline-none transition"
+              ) : (
+                <div className="space-y-6">
+                  {/* 头像上传组件 */}
+                  {user && (
+                    <AvatarUpload
+                      currentAvatarUrl={user.user_metadata?.avatar_url}
+                      userId={user.id}
+                      onUploadSuccess={(avatarUrl) => {
+                        // 更新本地用户状态
+                        setUser({
+                          ...user,
+                          user_metadata: {
+                            ...user.user_metadata,
+                            avatar_url: avatarUrl
+                          }
+                        })
+                      }}
+                      onUploadError={(error) => {
+                        console.error('头像上传失败:', error)
+                      }}
                     />
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">姓名</label>
+                      <input
+                        type="text"
+                        defaultValue={user?.user_metadata?.name || "张三"}
+                        className="w-full px-4 py-3 rounded-xl bg-secondary/30 border border-border focus:border-primary-light focus:outline-none transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">邮箱</label>
+                      <input
+                        type="email"
+                        defaultValue={user?.email || "zhangsan@example.com"}
+                        className="w-full px-4 py-3 rounded-xl bg-secondary/30 border border-border focus:border-primary-light focus:outline-none transition"
+                        disabled
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">职位</label>
+                      <input
+                        type="text"
+                        defaultValue={user?.user_metadata?.position || "数据分析师"}
+                        className="w-full px-4 py-3 rounded-xl bg-secondary/30 border border-border focus:border-primary-light focus:outline-none transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">部门</label>
+                      <input
+                        type="text"
+                        defaultValue={user?.user_metadata?.department || "电商分析部"}
+                        className="w-full px-4 py-3 rounded-xl bg-secondary/30 border border-border focus:border-primary-light focus:outline-none transition"
+                      />
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-2">邮箱</label>
-                    <input
-                      type="email"
-                      defaultValue="zhangsan@example.com"
-                      className="w-full px-4 py-3 rounded-xl bg-secondary/30 border border-border focus:border-primary-light focus:outline-none transition"
+                    <label className="block text-sm font-medium mb-2">个人简介</label>
+                    <textarea
+                      className="w-full h-24 px-4 py-3 rounded-xl bg-secondary/30 border border-border focus:border-primary-light focus:outline-none transition"
+                      defaultValue={user?.user_metadata?.bio || "专注于电商数据分析和市场趋势研究，擅长使用AI工具提升分析效率。"}
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">职位</label>
-                    <input
-                      type="text"
-                      defaultValue="数据分析师"
-                      className="w-full px-4 py-3 rounded-xl bg-secondary/30 border border-border focus:border-primary-light focus:outline-none transition"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">部门</label>
-                    <input
-                      type="text"
-                      defaultValue="电商分析部"
-                      className="w-full px-4 py-3 rounded-xl bg-secondary/30 border border-border focus:border-primary-light focus:outline-none transition"
-                    />
-                  </div>
+                  <button className="px-6 py-3 rounded-xl bg-gradient-to-r from-primary to-primary-light text-white font-medium hover:opacity-90 transition">
+                    保存更改
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">个人简介</label>
-                  <textarea
-                    className="w-full h-24 px-4 py-3 rounded-xl bg-secondary/30 border border-border focus:border-primary-light focus:outline-none transition"
-                    defaultValue="专注于电商数据分析和市场趋势研究，擅长使用AI工具提升分析效率。"
-                  />
-                </div>
-                <button className="px-6 py-3 rounded-xl bg-gradient-to-r from-primary to-primary-light text-white font-medium hover:opacity-90 transition">
-                  保存更改
-                </button>
-              </div>
+              )}
             </div>
           )}
 

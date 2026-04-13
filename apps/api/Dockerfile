@@ -30,4 +30,5 @@ COPY src/ ./src/
 EXPOSE 8000
 
 # 启动命令
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# 使用环境变量PORT，默认8000
+CMD uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8000}
