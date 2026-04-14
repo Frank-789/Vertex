@@ -1,6 +1,6 @@
 'use client'
 
-import { MessageSquare, Crawl, FileText, Users, BarChart, Settings, Zap, Shield, Globe, Cpu } from 'lucide-react'
+import { MessageSquare, Globe, FileText, Users, BarChart, Settings, Zap, Shield, Cpu } from 'lucide-react'
 
 export default function FeaturesPage() {
   const features = [
@@ -27,7 +27,7 @@ export default function FeaturesPage() {
       id: 'crawler',
       title: '数据爬取',
       description: '多平台电商数据爬取工具，支持京东、淘宝、亚马逊等主流电商平台。',
-      icon: Crawl,
+      icon: Globe,
       capabilities: [
         '多平台支持（京东、淘宝、亚马逊等）',
         '智能反爬虫绕过',

@@ -1,9 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { User, Mail, Briefcase, Building, Calendar, MapPin } from 'lucide-react'
+import { useAuthStore } from '@/lib/store/useAuthStore'
+import AvatarUpload from '@/components/ui/AvatarUpload'
 
 export default function ProfilePage() {
+  const { user, isLoading, checkAuth } = useAuthStore()
   const [isEditing, setIsEditing] = useState(false)
   const [profile, setProfile] = useState({
     name: '张三',
@@ -15,6 +18,10 @@ export default function ProfilePage() {
     joinDate: '2024-01-15',
     phone: '+86 138 0013 8000',
   })
+
+  useEffect(() => {
+    checkAuth()
+  }, [checkAuth])
 
   const handleSave = () => {
     setIsEditing(false)
@@ -36,9 +43,23 @@ export default function ProfilePage() {
         <div className="lg:col-span-1">
           <div className="glass rounded-2xl p-6">
             <div className="flex flex-col items-center">
-              <div className="w-32 h-32 rounded-full bg-gradient-to-br from-primary-light to-accent mb-4 flex items-center justify-center text-white text-4xl font-bold">
-                {profile.name.charAt(0)}
-              </div>
+              {/* 头像上传组件 */}
+              {user && (
+                <div className="mb-6 w-full">
+                  <AvatarUpload
+                    currentAvatarUrl={null}
+                    userId={user.id}
+                    onUploadSuccess={(avatarUrl) => {
+                      console.log('头像上传成功:', avatarUrl)
+                      // 可以在这里更新用户头像状态
+                    }}
+                    onUploadError={(error) => {
+                      console.error('头像上传失败:', error)
+                    }}
+                  />
+                </div>
+              )}
+
               <h2 className="text-xl font-bold mb-1">{profile.name}</h2>
               <p className="text-text-muted mb-4">{profile.position}</p>
 

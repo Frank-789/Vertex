@@ -1,12 +1,9 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import Sidebar from "@/components/layout/Sidebar";
 import UserAvatar from "@/components/layout/UserAvatar";
 import { createClient } from "@/lib/supabase/server";
 import { Providers } from "./providers";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Vertex AI - 电商智能体",
@@ -22,7 +19,7 @@ export default async function RootLayout({
   const { data: { user } } = await supabase.auth.getUser();
 
   return (
-    <html lang="zh-CN" className={`${inter.className} h-full antialiased`}>
+    <html lang="zh-CN" className="h-full antialiased">
       <body className="min-h-screen bg-background text-foreground flex">
         <Providers>
           {/* 侧边栏 */}

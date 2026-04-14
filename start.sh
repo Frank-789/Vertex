@@ -82,6 +82,15 @@ check_env() {
         print_warn "Supabase配置未设置，部分功能可能受限"
         print_warn "请访问 https://supabase.com 创建项目并更新.env.local"
     fi
+
+    # 检查DeepSeek API密钥
+    if grep -q "DEEPSEEK_API_KEY=sk-" "$WEB_DIR/.env.local"; then
+        echo "✓ DeepSeek API密钥已配置"
+    else
+        print_warn "DeepSeek API密钥未配置或格式不正确"
+        print_warn "请编辑 $WEB_DIR/.env.local 设置DEEPSEEK_API_KEY"
+        print_warn "格式应为: DEEPSEEK_API_KEY=sk-xxxxxxxx"
+    fi
 }
 
 install_deps() {
@@ -117,6 +126,17 @@ start_backend() {
     # 激活虚拟环境
     if [ -f ".venv/bin/activate" ]; then
         source .venv/bin/activate
+    fi
+
+    # 设置DeepSeek API环境变量
+    if [ -f "$WEB_DIR/.env.local" ]; then
+        DEEPSEEK_API_KEY=$(grep DEEPSEEK_API_KEY "$WEB_DIR/.env.local" | cut -d '=' -f2)
+        if [ -n "$DEEPSEEK_API_KEY" ]; then
+            export DEEPSEEK_API_KEY
+            echo "已设置DEEPSEEK_API_KEY环境变量"
+        else
+            print_warn "未找到DEEPSEEK_API_KEY配置，AI聊天功能可能受限"
+        fi
     fi
 
     # 检查是否已安装依赖

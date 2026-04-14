@@ -6,6 +6,7 @@ Vertex真实AI分析器
 import pandas as pd
 import requests
 import json
+import time
 from typing import List, Dict, Optional
 import os
 
@@ -29,6 +30,11 @@ class AIProductAnalyzer:
                 'endpoint': 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation',
                 'api_key': os.getenv('QWEN_API_KEY', ''),
                 'model': 'qwen-plus'
+            },
+            'deepseek': {
+                'endpoint': 'https://api.deepseek.com/v1/chat/completions',
+                'api_key': os.getenv('DEEPSEEK_API_KEY', ''),
+                'model': 'deepseek-chat'
             }
         }
     
@@ -236,7 +242,136 @@ class AIProductAnalyzer:
                 
         except Exception as e:
             return f"调用通义千问API时出错: {str(e)}\n\n" + self._get_api_key_guide('通义千问')
-    
+
+    def _estimate_tokens(self, text: str) -> int:
+        """粗略估计token数量（英文约4字符=1token，中文约1字符=2tokens）"""
+        import re
+        english_words = len(re.findall(r'\b[a-zA-Z]+\b', text))
+        chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', text))
+        return english_words + chinese_chars * 2
+
+    def _truncate_prompt(self, prompt: str, max_tokens: int = 130000) -> str:
+        """截断提示词到指定token数量"""
+        estimated = self._estimate_tokens(prompt)
+        if estimated <= max_tokens:
+            return prompt
+
+        # 按比例截断
+        ratio = max_tokens / estimated
+        new_length = int(len(prompt) * ratio)
+        truncated = prompt[:new_length]
+
+        # 记录日志（可以添加logging模块）
+        print(f"提示词从{estimated} tokens截断到{self._estimate_tokens(truncated)} tokens")
+        return truncated + "\n\n[提示：由于长度限制，部分内容已被截断]"
+
+    def _truncate_prompt_by_half(self, prompt: str) -> str:
+        """将提示词截断一半"""
+        half_length = len(prompt) // 2
+        truncated = prompt[:half_length]
+        print(f"提示词截断一半，从{len(prompt)}字符到{len(truncated)}字符")
+        return truncated + "\n\n[提示：由于长度限制，内容已被截断]"
+
+    def _call_deepseek(self, prompt: str, max_retries: int = 3) -> str:
+        """调用DeepSeek API，支持重试和上下文长度管理"""
+        api_key = self.apis['deepseek']['api_key']
+
+        # 调试信息
+        print(f"[DEBUG] DeepSeek API Key: {api_key[:10]}... (length: {len(api_key)})")
+        print(f"[DEBUG] DeepSeek Endpoint: {self.apis['deepseek']['endpoint']}")
+        print(f"[DEBUG] Prompt length: {len(prompt)} chars, estimated tokens: {self._estimate_tokens(prompt)}")
+
+        if not api_key:
+            print("错误: DEEPSEEK_API_KEY环境变量未设置")
+            return self._get_api_key_guide('DeepSeek')
+
+        # 检查API Key格式
+        if not api_key.startswith('sk-'):
+            print(f"警告: DeepSeek API Key格式可能不正确: {api_key[:10]}...")
+
+        for attempt in range(max_retries):
+            try:
+                headers = {
+                    'Authorization': f'Bearer {api_key}',
+                    'Content-Type': 'application/json'
+                }
+
+                # 检查上下文长度，避免超出限制
+                estimated_tokens = self._estimate_tokens(prompt)
+                if estimated_tokens > 130000:  # 留出安全边际
+                    print(f"警告: 提示词过长: {estimated_tokens} tokens，进行截断")
+                    prompt = self._truncate_prompt(prompt, max_tokens=130000)
+                    estimated_tokens = self._estimate_tokens(prompt)
+                    print(f"截断后: {estimated_tokens} tokens")
+
+                # 根据DeepSeek官方文档构建消息（兼容OpenAI格式）
+                data = {
+                    'model': self.apis['deepseek']['model'],
+                    'messages': [
+                        {'role': 'system', 'content': '你是一个专业的电商助手，帮助用户解决电商相关的问题。'},
+                        {'role': 'user', 'content': prompt}
+                    ],
+                    'stream': False,
+                    'max_tokens': 2000  # 限制回复长度
+                }
+
+                response = requests.post(
+                    self.apis['deepseek']['endpoint'],
+                    headers=headers,
+                    json=data,
+                    timeout=30
+                )
+
+                if response.status_code == 200:
+                    result = response.json()
+                    return result['choices'][0]['message']['content']
+
+                elif response.status_code == 400:
+                    # 处理上下文长度错误
+                    error_msg = response.text
+                    if "maximum context length" in error_msg:
+                        print(f"错误: 上下文长度超限: {error_msg}")
+                        # 尝试截断提示词并重试
+                        prompt = self._truncate_prompt_by_half(prompt)
+                        print(f"第{attempt + 1}次重试: 提示词截断一半")
+                        if attempt < max_retries - 1:
+                            time.sleep(1)
+                            continue
+                        else:
+                            return "抱歉，消息过长，即使截断后仍超出限制。请简化您的问题。"
+                    else:
+                        return f"API请求参数错误 (400): {error_msg}"
+
+                elif response.status_code == 401:
+                    return f"API Key无效或过期，请检查DEEPSEEK_API_KEY环境变量。\n\n" + self._get_api_key_guide('DeepSeek')
+
+                elif response.status_code == 429:
+                    wait_time = 2 ** attempt  # 指数退避
+                    print(f"警告: 速率限制，等待{wait_time}秒后重试...")
+                    time.sleep(wait_time)
+                    continue  # 重试
+
+                else:
+                    return f"API调用失败: {response.status_code} - {response.text}"
+
+            except requests.exceptions.Timeout:
+                print(f"警告: 请求超时，尝试 {attempt + 1}/{max_retries}")
+                if attempt < max_retries - 1:
+                    time.sleep(1)
+                    continue
+                else:
+                    return "请求超时，请稍后重试"
+
+            except Exception as e:
+                print(f"错误: 调用DeepSeek API时出错: {str(e)}")
+                if attempt < max_retries - 1:
+                    time.sleep(1)
+                    continue
+                else:
+                    return f"调用DeepSeek API时出错: {str(e)}\n\n" + self._get_api_key_guide('DeepSeek')
+
+        return "API调用失败，已达到最大重试次数"
+
     def _get_api_key_guide(self, model_name: str) -> str:
         """获取API Key配置指南"""
         guides = {
@@ -314,9 +449,58 @@ class AIProductAnalyzer:
    ```python
    'api_key': 'YOUR_API_KEY'
    ```
+""",
+            'DeepSeek': """
+## 🔑 如何配置DeepSeek API Key
+
+1. **注册账号**
+   - 访问: https://platform.deepseek.com/
+   - 注册DeepSeek账号
+
+2. **获取API Key**
+   - 进入API Keys页面
+   - 点击"Create API Key"
+   - 复制API Key（格式: sk-xxxxxxxx）
+
+3. **配置到项目**
+   方法1：环境变量（推荐）
+   ```bash
+   export DEEPSEEK_API_KEY='sk-your-api-key'
+   ```
+
+   方法2：直接在代码中设置
+   ```python
+   # 在ai_analyzer.py中配置：
+   'api_key': 'sk-your-api-key'
+   ```
+
+4. **费用说明**
+   - 新用户: 免费额度
+   - 价格实惠，支持中文
+   - API兼容OpenAI格式
+
+5. **API调用示例**
+   ```python
+   # 使用OpenAI SDK
+   from openai import OpenAI
+
+   client = OpenAI(
+       api_key='sk-your-api-key',
+       base_url="https://api.deepseek.com"
+   )
+
+   response = client.chat.completions.create(
+       model="deepseek-chat",
+       messages=[
+           {"role": "system", "content": "You are a helpful assistant"},
+           {"role": "user", "content": "Hello"},
+       ],
+       stream=False
+   )
+   ```
 """
         }
-        
+
         return guides.get(model_name, "")
     
     def _fallback_analysis(self, products_data: List[Dict], config: Dict) -> str:
@@ -380,21 +564,23 @@ class AIProductAnalyzer:
         Returns:
             str: AI回复
         """
-        # 选择AI模型（默认为Claude）
-        ai_model = "Claude"
+        # 选择AI模型（默认为DeepSeek）
+        ai_model = "deepseek"
 
         # 构建聊天提示
         prompt = self._build_chat_prompt(message, context)
 
         # 调用AI
-        if 'Claude' in ai_model:
+        if 'deepseek' in ai_model.lower():
+            return self._call_deepseek(prompt)
+        elif 'Claude' in ai_model:
             return self._call_claude(prompt)
         elif '豆包' in ai_model:
             return self._call_doubao(prompt)
         elif '通义千问' in ai_model:
             return self._call_qwen(prompt)
         else:
-            return "请配置AI API Key以使用聊天功能。"
+            return self._call_deepseek(prompt)  # 默认使用DeepSeek
 
     def _build_chat_prompt(self, message: str, context: Optional[Dict] = None) -> str:
         """构建聊天提示词"""
