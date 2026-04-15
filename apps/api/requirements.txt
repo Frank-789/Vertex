@@ -16,3 +16,4 @@ python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 python-dateutil==2.9.0
 pytest==7.4.4
+DrissionPage==4.0.0
