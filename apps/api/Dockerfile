@@ -12,7 +12,6 @@ RUN apt-get update && apt-get install -y \
     fonts-freefont-ttf \
     fontconfig \
     libxss1 \
-    libappindicator1 \
     libnspr4 \
     libnss3 \
     libasound2 \

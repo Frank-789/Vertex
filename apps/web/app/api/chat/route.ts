@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-
-const PYTHON_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+import { chatWithDeepSeek, DeepSeekChatRequest } from '@/lib/deepseek'
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,29 +21,37 @@ export async function POST(request: NextRequest) {
 
     // 获取请求数据
     const body = await request.json()
-    const { message, file_url } = body
+    const { message, file_url, file_content } = body
 
     if (!message) {
       return NextResponse.json({ error: '消息内容不能为空' }, { status: 400 })
     }
 
-    // 转发到Python后端
-    const response = await fetch(`${PYTHON_API_URL}/api/v1/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-User-Id': userId,
-      },
-      body: JSON.stringify({ message, file_url, user_id: userId }),
-    })
+    // 准备DeepSeek请求
+    const deepseekRequest: DeepSeekChatRequest = {
+      message,
+      fileContent: file_content, // 直接使用文件内容
+      context: {
+        user_id: userId,
+        file_url: file_url || null
+      }
+    };
 
-    if (!response.ok) {
-      const error = await response.text()
-      throw new Error(`Python后端错误: ${error}`)
-    }
+    // 如果有file_url但没有file_content，可以尝试获取文件内容
+    // 注意：这里简化处理，实际可能需要调用文件上传API获取内容
+    // 当前版本假设前端已提供file_content或文件内容已在前端提取
 
-    const data = await response.json()
-    return NextResponse.json(data)
+    // 调用DeepSeek API
+    const result = await chatWithDeepSeek(deepseekRequest);
+
+    // 返回标准化响应（保持与之前兼容）
+    return NextResponse.json({
+      reply: result.reply,
+      file_uploaded: result.file_uploaded,
+      ai_used: result.ai_used,
+      ...(result.error && { error: result.error }),
+      ...(result.details && { details: result.details })
+    });
   } catch (error) {
     console.error('聊天API错误:', error)
     return NextResponse.json(
