@@ -69,7 +69,7 @@ export async function chatWithDeepSeek(request: DeepSeekChatRequest): Promise<De
               - 用户行为分析
               - 营销策略建议
 
-              请提供专业、实用、具体的建议。`
+              请提供专业、实用、具体的建议。请使用纯文本回复，不要使用Markdown格式、星号或其他标记符号。`
             },
             {
               role: 'user',
